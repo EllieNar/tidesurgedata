@@ -90,6 +90,18 @@ class NOAACoops(BaseSource):
             raise ValueError(
                 f"Sampling window not defined for NOAA CO-OPS product: {self.product!r}"
             ) from None
+
+    @property
+    def max_request(self) -> pd.Timedelta:
+        """Return NOAA's max request duration for the specified interval"""
+        limits = {"1": pd.Timedelta("4D"), "6": pd.Timedelta("30D"), "h": pd.Timedelta("365D")}
+        # NOAA water_level default is 6-min data
+        interval = self.interval or "6"
+
+        try:
+            return limits[interval]
+        except KeyError:
+            raise ValueError(f"Unsupported NOAA CO-OPS interval: {interval!r}") from None
     
     # Describe the data
     def metadata(self) -> SeriesMeta:
