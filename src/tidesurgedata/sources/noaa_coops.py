@@ -65,12 +65,24 @@ class NOAACoops(BaseSource):
     # TODO(BL-05): confirm; max_request depends on interval (1-min: 4 days, 6-min: 1 month,
     # hourly: 1 year) and latency is not stated by the provider facts.
 
+    # Describe the data
     def metadata(self) -> SeriesMeta:
         raise NotImplementedError("BL-05")
 
+    # Retrieve the data from the API. Does the following:
+        # Construct NOAA parameters
+        # Make HTTP request
+        # Read JSON
+        # Extract observations
+        # Convert time streings -> UTC timestamps
+        # Convert values -> numeric
+        # Deal with missing values
+        # Interpret NOAA quality
+        # Return Series, Quality, request
     def _fetch(self, start: pd.Timestamp, end: pd.Timestamp) -> tuple[pd.Series, Quality, dict]:
         raise NotImplementedError("BL-05")
 
+    # Discover stations
     @classmethod
     def find_stations(
         cls, lat: float, lon: float, radius_km: float, variable: str | None = None
