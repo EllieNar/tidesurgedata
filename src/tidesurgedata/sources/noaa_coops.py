@@ -64,15 +64,47 @@ class NOAACoops(BaseSource):
     datum: str = "MSL"
     interval: str | None = None
 
+    def _units(self) -> str:
+        """determine canonical units for the selected NOAA product"""
+        units = {
+            "water_level": "m",
+            "predictions": "m",
+            "wind": "m s-1",
+            "air_pressure": "Pa",
+        }
+
+        try:
+            return units[self.product]
+        except KeyError:
+            raise ValueError(f"Unsupported NOAA CO-OPS product: {self.product!r}") from None
+
+    def _window(self) -> pd.Timedelta:
+        """Return the averaging window for the selected NOAA product."""
+        windows = {
+            "water_level": pd.Timedelta("3min"),
+        }
+
+        try:
+            return windows[self.product]
+        except KeyError:
+            raise ValueError(
+                f"Sampling window not defined for NOAA CO-OPS product: {self.product!r}"
+            ) from None
+    
     # Describe the data
     def metadata(self) -> SeriesMeta:
         # Somehow obtain station info
-        metadata_url = (f"https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/{self.station_id}.json")
+        metadata_url = (
+            "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/"
+            f"stations/{self.station_id}.json"
+            )
+
         response = requests.get(metadata_url)
         response.raise_for_status()
 
         raw = response.json()
         station = raw["stations"][0]
+
 
         return SeriesMeta(
             source=self.registry_name,
@@ -80,13 +112,13 @@ class NOAACoops(BaseSource):
             variable=self.product,
             lat=station["lat"],
             lon=station["lng"],
-            units=_"m",
-            datum= self.datum,
-            sampling= "window_mean",
-            window= pd.Timedelta("3min"),
-            label= "centre",
-            licence= #,
-            attribution= #,
+            units=self._units(),
+            datum=self.datum if self.product in {"water_level", "predictions"} else None,
+            sampling="window_mean",
+            window=self._window(),
+            label="centre",
+            licence="US Government public domain",  # TODO(BL-05): confirm canonical wording
+            attribution="NOAA CO-OPS",
             url=station["self"],
             name=station["name"],
         )
