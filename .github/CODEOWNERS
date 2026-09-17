@@ -1,0 +1,7 @@
+/src/tidesurgedata/meta.py          @thomasmonahan
+/src/tidesurgedata/contract.py      @thomasmonahan
+/src/tidesurgedata/sources/base.py  @thomasmonahan
+/src/tidesurgedata/recipe.py        @thomasmonahan
+/pyproject.toml                     @thomasmonahan
+/.github/                           @thomasmonahan
+/docs/design/                       @thomasmonahan
