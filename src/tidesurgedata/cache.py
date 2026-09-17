@@ -47,8 +47,8 @@ class Cache:
     - Each chunk stores the series and its :class:`~tidesurgedata.meta.FetchRecord` (as JSON
       metadata). A request is served from cache only if every chunk it overlaps is present and
       not expired; otherwise missing/expired chunks are fetched and written.
-    - Writes go to a temporary file in the same directory followed by ``os.replace``, so readers
-      never see partial files.
+    - Writes go to a temporary file (suffix ``.tmp``) in the same directory followed by
+      ``os.replace``, so readers never see partial ``.parquet`` files.
     - Implementation adds ``cache: Cache | None = None`` to ``BaseSource.fetch`` and
       ``fetch_with_record``.
     """

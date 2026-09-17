@@ -50,8 +50,9 @@ def to_grid(
         Metadata of ``series``; ``sampling``, ``window`` and ``label`` define its time
         convention.
     freq : str or pandas.Timedelta
-        Grid spacing. Grid points are multiples of ``freq`` since the epoch
-        (see :func:`tidesurgedata.timeutil.regular_grid`) covering the span of ``series``.
+        Grid spacing. Grid points are multiples of ``freq`` since the epoch, from the first
+        (relabelled) timestamp floored to ``freq`` through the last ceiled to ``freq``,
+        inclusive. An empty input gives an empty output.
     how : {"instant", "mean"}
         ``"instant"``: the value at the grid time if present, else the nearest sample within
         ``freq / 10``, else NaN.

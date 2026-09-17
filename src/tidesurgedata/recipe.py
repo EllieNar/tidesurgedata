@@ -333,6 +333,12 @@ class Recipe:
             - for drivers with a forecast source, values at valid times after ``issued`` come
               from ``forecast.fetch_forecast(issued, ...)``.
 
+        Notes
+        -----
+        :func:`~tidesurgedata.align.materialise_lags` keeps its input index, so extend each
+        gridded driver series to the end of the forecast grid (with NaN) before lagging;
+        otherwise lagged values at future valid times are lost.
+
         Raises
         ------
         ValueError
