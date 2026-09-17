@@ -9,3 +9,7 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - Repository scaffold: packaging, tooling, CI, data contracts, fake sources, typed adapter stubs,
   spec tests, design records and backlog.
+
+### Changed
+- Minimum supported Python is 3.12 (CI tests 3.12–3.14): the latest `numpy`, `zarr` and
+  `icechunk` releases require it, and `icechunk` has no Python 3.10 wheels.

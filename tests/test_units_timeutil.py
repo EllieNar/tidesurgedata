@@ -56,7 +56,7 @@ def test_canonical_set():
     [
         "2024-01-01T00:00Z",
         "2024-01-01T01:00+01:00",
-        dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc),
+        dt.datetime(2024, 1, 1, tzinfo=dt.UTC),
         pd.Timestamp("2024-01-01", tz="UTC"),
     ],
 )

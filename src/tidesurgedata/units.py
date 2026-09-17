@@ -8,7 +8,6 @@ Vectors are stored as components (``u``, ``v``), never as speed and direction.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TypeVar
 
 import numpy as np
 import pandas as pd
@@ -49,15 +48,13 @@ _CONVERSIONS: dict[tuple[str, str], Callable[[np.ndarray], np.ndarray]] = {
     ("degF", "K"): lambda x: (x - 32.0) * 5.0 / 9.0 + 273.15,
 }
 
-T = TypeVar("T", float, np.ndarray, pd.Series)
-
 
 def is_canonical(unit: str) -> bool:
     """Return True if ``unit`` is one of the canonical unit strings."""
     return unit in CANONICAL
 
 
-def convert(values: T, from_unit: str, to_unit: str) -> T:
+def convert[T: (float, np.ndarray, pd.Series)](values: T, from_unit: str, to_unit: str) -> T:
     """Convert ``values`` from ``from_unit`` to the canonical ``to_unit``.
 
     Parameters
