@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environments and caches
+.venv/
+.pytest_cache/
+.cache/
+
+# Consumers / large files
+rtide_saves/
+*.bsp
+
+# OS
+.DS_Store
