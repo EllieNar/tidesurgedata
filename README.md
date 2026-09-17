@@ -38,6 +38,40 @@ pip install "tidesurgedata[all]"        # everything above
 
 Until the first release, install from a clone with `pip install -e ".[dev]"`.
 
+## Usage (Dummy Data)
+```
+import pandas as pd
+import tidesurgedata as tsd
+from tidesurgedata.sources.fake import FakeMet, FakeRiver, FakeTideGauge
+
+met, river = FakeMet(), FakeRiver()
+gauge = FakeTideGauge(pressure=met, river=river)
+
+# Fetch data plus its provenance record
+s, record = gauge.fetch_with_record("2024-01-01T00:00Z", "2024-01-08T00:00Z")
+print(s.head(), record.quality, record.meta.units)
+
+# Forecasts: latest initialisation available by the issue time
+fc = met.fetch_forecast("2024-01-05T12:00Z", pd.Timedelta("48h"))
+print(fc.init_time, fc.values.columns.tolist())
+
+# Recipe logic that already works
+recipe = tsd.Recipe(
+    target=gauge,
+    drivers=(
+        tsd.Driver("discharge", river, lags_hours=(-24, -12)),
+        tsd.Driver("pressure", met, lags_hours=(0,), forecast=met),
+    ),
+    target_column="observations",
+)
+print(recipe.feature_columns)   # ['discharge_lag-24h', 'discharge_lag-12h', 'pressure_lag0h']
+print(recipe.max_lead_time)     # 0 days 11:00:00
+print(recipe.to_json())
+
+recipe.training_frame("2024-01-01T00:00Z", "2024-01-08T00:00Z")  # NotImplementedError: BL-12
+
+```
+
 ## Usage (planned API)
 
 The snippet below illustrates the intended API. Only the fake sources work today.
