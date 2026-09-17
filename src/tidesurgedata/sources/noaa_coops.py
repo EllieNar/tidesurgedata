@@ -26,12 +26,14 @@ Implementation checklist
       ``xfail``/``skip`` markers.
 - [ ] Live smoke test passes; licence and attribution recorded; CHANGELOG entry.
 """
+# See https://www.ncei.noaa.gov/support/access-data-service-api-user-documentation
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import pandas as pd
+import requests
 
 from tidesurgedata.meta import Quality, SeriesMeta
 from tidesurgedata.sources.base import BaseSource
@@ -62,12 +64,32 @@ class NOAACoops(BaseSource):
     datum: str = "MSL"
     interval: str | None = None
 
-    # TODO(BL-05): confirm; max_request depends on interval (1-min: 4 days, 6-min: 1 month,
-    # hourly: 1 year) and latency is not stated by the provider facts.
-
     # Describe the data
     def metadata(self) -> SeriesMeta:
-        raise NotImplementedError("BL-05")
+        # Somehow obtain station info
+        metadata_url = (f"https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/{self.station_id}.json")
+        response = requests.get(metadata_url)
+        response.raise_for_status()
+
+        raw = response.json()
+        station = raw["stations"][0]
+
+        return SeriesMeta(
+            source=self.registry_name,
+            station_id=self.station_id,
+            variable=self.product,
+            lat=station["lat"],
+            lon=station["lng"],
+            units=_#,
+            datum= self.datum,
+            sampling= #,
+            window= #,
+            label= #,
+            licence= #,
+            attribution= #,
+            url=station["self"],
+            name=station["name"],
+        )
 
     # Retrieve the data from the API. Does the following:
         # Construct NOAA parameters
