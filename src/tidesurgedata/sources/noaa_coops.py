@@ -123,18 +123,50 @@ class NOAACoops(BaseSource):
             name=station["name"],
         )
 
-    # Retrieve the data from the API. Does the following:
-        # Construct NOAA parameters
-        # Make HTTP request
-        # Read JSON
-        # Extract observations
-        # Convert time streings -> UTC timestamps
-        # Convert values -> numeric
-        # Deal with missing values
-        # Interpret NOAA quality
-        # Return Series, Quality, request
-    def _fetch(self, start: pd.Timestamp, end: pd.Timestamp) -> tuple[pd.Series, Quality, dict]:
-        raise NotImplementedError("BL-05")
+    # Retrieve the data from the API
+    def _fetch(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[pd.Series, Quality, dict]:
+
+        params = {
+            "product": self.product,
+            "application": "tidesurgedata",
+            "begin_date": start.strftime("%Y%m%d %H:%M"),
+            "end_date": end.strftime("%Y%m%d %H:%M"),
+            "datum": self.datum,
+            "station": self.station_id,
+            "time_zone": "gmt",
+            "units": "metric",
+            "format": "json",
+        }
+
+        data_url = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
+
+        response = requests.get(data_url, params=params)
+        response.raise_for_status()
+
+        raw = response.json()
+        df = pd.DataFrame(raw["data"])
+
+        times = pd.to_datetime(df["t"], utc=True)
+        values = pd.to_numeric(df["v"], errors="coerce")
+
+        series = pd.Series(
+            values.to_numpy(),
+            index=pd.DatetimeIndex(times),
+            dtype="float64",
+        )
+
+        qualities = set(df["q"])
+
+        if qualities == {"v"}:
+            quality: Quality = "verified"
+        elif qualities == {"p"}:
+            quality = "preliminary"
+        else:
+            quality = "mixed"
+
+        return series, quality, params
 
     # Discover stations
     @classmethod
