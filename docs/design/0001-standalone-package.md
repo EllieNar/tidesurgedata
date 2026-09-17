@@ -8,8 +8,7 @@
 Coastal and hydrological forecasting work repeatedly re-implements the same plumbing: calling
 provider APIs with different limits, units, datums and time conventions, then assembling
 lagged training and forecast datasets. RTide is one important consumer of such data, but the
-same data is useful for many other models and analyses. RTide is a separate package with its own
-licence and ownership.
+same data is useful for many other models and analyses.
 
 ## Decision
 
