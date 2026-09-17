@@ -1,0 +1,47 @@
+# Optional compatibility check with RTide's public API. NOT a required check: RTide releases must
+# never block this package. RTide is installed only here and is not a dependency of tidesurgedata.
+name: rtide-compat
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1" # weekly, Monday 05:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rtide-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rtide-compat:
+    name: rtide-compat
+    runs-on: ubuntu-latest
+    env:
+      DE421_DIR: ${{ github.workspace }}/.cache/ephemeris
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12" # a version supported by TensorFlow
+          cache: pip
+      - name: Cache Skyfield ephemeris
+        uses: actions/cache@v6
+        with:
+          path: .cache/ephemeris
+          key: de421-bsp-v1
+      - run: python -m pip install --upgrade pip
+      - name: Install package and RTide
+        id: install
+        continue-on-error: true # pending until rtide 1.0.1 is published on PyPI
+        run: pip install -e ".[test]" "rtide>=1.0.1,<1.1"
+      - name: RTide not installable
+        if: steps.install.outcome != 'success'
+        run: echo "::warning::rtide>=1.0.1,<1.1 is not installable from PyPI; compatibility tests skipped."
+      - name: Run compatibility tests
+        if: steps.install.outcome == 'success'
+        run: pytest -m rtide
