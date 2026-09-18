@@ -64,7 +64,7 @@ class NOAACoops(BaseSource):
     interval: str | None = None
 
     def _units(self) -> str:
-        """determine canonical units for the selected NOAA product"""
+        """Determine canonical units for the selected NOAA product"""
         units = {
             "water_level": "m",
             "predictions": "m",
@@ -90,12 +90,39 @@ class NOAACoops(BaseSource):
                 f"Sampling window not defined for NOAA CO-OPS product: {self.product!r}"
             ) from None
 
+    def _noaa_product(self) -> str:
+        """Returns the appropriate NOAA API product name, according to interval"""
+        if self.product != "water_level":
+            return self.product
+
+        product = {
+            "1" : "one_minute_water_level",
+            "6" : "water_level",
+            "h" : "hourly_height",
+            None : "water_level",
+        }
+
+        try:
+            return product[self.interval]
+        except KeyError:
+            raise ValueError(f"Unsupported water-level interval: {self.interval!r}") from None
+
     @property
     def max_request(self) -> pd.Timedelta:
         """Return NOAA's maximum request duration for 6-minute water-level data."""
-        return pd.Timedelta("30D")
+        limits = {
+            "1": pd.Timedelta("4D"),
+            "6": pd.Timedelta("30D"),
+            "h": pd.Timedelta("365D"),
+            None: pd.Timedelta("30D"),
+        }
 
-    # Describe the data
+        return limits[self.interval]
+
+    # NOAA Metadata API --> What/Where is this station?
+        # API: https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/<station>.json
+        # Purpose: Tell me about <station>
+        # Returns: name, latitude, logitude, available metadata, etc
     def metadata(self) -> SeriesMeta:
         # Somehow obtain station info
         metadata_url = (
@@ -127,13 +154,16 @@ class NOAACoops(BaseSource):
             name=station["name"],
         )
 
-    # Retrieve the data from the API
+    # Retrieve the data from the NOAA API
+        # API: https://api.tidesandcurrents.noaa.gov/api/prod/datagetter
+        # Purpose: Give me OBSERVATIONS from <station>
+        # Inputs: station name, water level, datum etc (params taken from self)
     def _fetch(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> tuple[pd.Series, Quality, dict]:
 
         params = {
-            "product": self.product,
+            "product": self._noaa_product(),
             "application": "tidesurgedata",
             "begin_date": start.strftime("%Y%m%d %H:%M"),
             "end_date": end.strftime("%Y%m%d %H:%M"),
@@ -161,14 +191,20 @@ class NOAACoops(BaseSource):
             dtype="float64",
         )
 
-        qualities = set(df["q"])
+        if self._noaa_product() == "one_minute_water_level":
+            quality: Quality = "preliminary"
 
-        if qualities == {"v"}:
-            quality: Quality = "verified"
-        elif qualities == {"p"}:
-            quality = "preliminary"
+        elif self._noaa_product() == "hourly_height":
+            quality = "verified"
         else:
-            quality = "mixed"
+            qualities = set(df["q"])
+
+            if qualities == {"v"}:
+                quality = "verified"
+            elif qualities == {"p"}:
+                quality = "preliminary"
+            else:
+                quality = "mixed"
 
         return series, quality, params
 
