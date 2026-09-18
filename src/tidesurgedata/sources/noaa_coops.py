@@ -35,7 +35,7 @@ import pandas as pd
 import requests
 
 from tidesurgedata.meta import Quality, SeriesMeta
-from tidesurgedata.sources.base import BaseSource
+from tidesurgedata.sources.base import BaseSource, haversine_km
 from tidesurgedata.sources.registry import register_source
 
 __all__ = ["NOAACoops"]
@@ -115,6 +115,20 @@ class NOAACoops(BaseSource):
             return product[self.interval]
         except KeyError:
             raise ValueError(f"Unsupported water-level interval: {self.interval!r}") from None
+
+    def _supports_one_minute(self) -> bool:
+        """Return whether NOAA lists this station as having 1-minute water-level data."""
+        url = (
+            "https://api.tidesandcurrents.noaa.gov/"
+            "mdapi/prod/webapi/stations.json?type=1minute"
+        )
+
+        response = requests.get(url)
+        response.raise_for_status()
+        stations = response.json()["stations"]
+
+        return any(station["id"] == self.station_id for station in stations)
+
 
     @property
     def max_request(self) -> pd.Timedelta:
@@ -227,4 +241,40 @@ class NOAACoops(BaseSource):
     def find_stations(
         cls, lat: float, lon: float, radius_km: float, variable: str | None = None
     ) -> list[SeriesMeta]:
-        raise NotImplementedError("BL-05")
+
+        if variable is None:
+            variable = "water_level"
+
+        if variable != "water_level":
+            raise ValueError(f"Station discovery not yet implemented for NOAA variable: {variable!r}")
+
+        url = ("https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=waterlevels")
+        response = requests.get(url)
+        response.raise_for_status()
+        stations = response.json()["stations"]
+
+        nearby = [
+            station
+            for station in stations
+            if haversine_km(lat, lon, station["lat"], station["lng"]) <= radius_km
+        ]
+
+        return [
+            SeriesMeta(
+                source=cls.registry_name,
+                station_id=station["id"],
+                variable=variable,
+                lat=station["lat"],
+                lon=station["lng"],
+                units="m",
+                datum="MSL",
+                sampling="window_mean",
+                window=pd.Timedelta("3min"),
+                label="centre",
+                licence="US Government public domain",  # TODO(BL-05): confirm canonical wording
+                attribution="NOAA CO-OPS",
+                url=station["self"],
+                name=station["name"],
+            )
+            for station in nearby
+        ]
