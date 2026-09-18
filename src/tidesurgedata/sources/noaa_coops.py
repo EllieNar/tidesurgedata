@@ -86,18 +86,13 @@ class NOAACoops(BaseSource):
         except KeyError:
             raise ValueError(f"Unsupported NOAA CO-OPS product: {self.product!r}") from None
 
-    def _window(self) -> pd.Timedelta:
-        """Return the averaging window for the selected NOAA product."""
-        windows = {
-            "water_level": pd.Timedelta("3min"),
-        }
 
-        try:
-            return windows[self.product]
-        except KeyError:
-            raise ValueError(
-                f"Sampling window not defined for NOAA CO-OPS product: {self.product!r}"
-            ) from None
+    def _sampling(self) -> tuple[str, pd.Timedelta | None, str | None]:
+        """Return sampling convention, averaging window and timestamp label."""
+        if self.product == "water_level":
+            return "window_mean", pd.Timedelta("3min"), "centre"
+
+        raise ValueError(f"Sampling metadata not defined for NOAA CO-OPS product:{self.product!r}")
 
     def _noaa_product(self) -> str:
         """Returns the appropriate NOAA API product name, according to interval"""
@@ -159,6 +154,8 @@ class NOAACoops(BaseSource):
         raw = response.json()
         station = raw["stations"][0]
 
+        sampling, window, label = self._sampling()
+
 
         return SeriesMeta(
             source=self.registry_name,
@@ -168,9 +165,9 @@ class NOAACoops(BaseSource):
             lon=station["lng"],
             units=self._units(),
             datum=self.datum if self.product in {"water_level", "predictions"} else None,
-            sampling="window_mean",
-            window=self._window(),
-            label="centre",
+            sampling=sampling,
+            window=window,
+            label=label,
             licence="US Government public domain",  # TODO(BL-05): confirm canonical wording
             attribution="NOAA CO-OPS",
             url=station["self"],
@@ -185,8 +182,10 @@ class NOAACoops(BaseSource):
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> tuple[pd.Series, Quality, dict]:
 
+        NOAAProduct = self._noaa_product()
+
         params = {
-            "product": self._noaa_product(),
+            "product": NOAAProduct,
             "application": "tidesurgedata",
             "begin_date": start.strftime("%Y%m%d %H:%M"),
             "end_date": end.strftime("%Y%m%d %H:%M"),
@@ -219,10 +218,10 @@ class NOAACoops(BaseSource):
             dtype="float64",
         )
 
-        if self._noaa_product() == "one_minute_water_level":
+        if NOAAProduct == "one_minute_water_level":
             quality: Quality = "preliminary"
 
-        elif self._noaa_product() == "hourly_height":
+        elif NOAAProduct == "hourly_height":
             quality = "verified"
         else:
             qualities = set(df["q"])
