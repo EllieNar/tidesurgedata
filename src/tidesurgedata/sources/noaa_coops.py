@@ -63,6 +63,15 @@ class NOAACoops(BaseSource):
     datum: str = "MSL"
     interval: str | None = None
 
+    def __post_init__(self) -> None:
+        valid_products = {"water_level", "predictions", "wind", "air_pressure"}
+
+        if self.product not in valid_products:
+            raise ValueError(f"Unsupported NOAA product: {self.product!r}")
+
+        if self.interval not in {None, "1", "6", "h"}:
+            raise ValueError(f"Unsupported NOAA CO-OPS interval: {self.interval!r}")
+
     def _units(self) -> str:
         """Determine canonical units for the selected NOAA product"""
         units = {
@@ -180,6 +189,11 @@ class NOAACoops(BaseSource):
         response.raise_for_status()
 
         raw = response.json()
+
+        if "error" in raw:
+            message = raw["error"].get("message", "Unknown NOAA CO-OPS error")
+            raise ValueError(f"NOAA CO-OPS: {message}")
+
         df = pd.DataFrame(raw["data"])
 
         times = pd.to_datetime(df["t"], utc=True)
