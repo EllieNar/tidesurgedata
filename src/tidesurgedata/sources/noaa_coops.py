@@ -33,6 +33,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 import requests
+import numpy as np
 
 from tidesurgedata.units import convert
 from tidesurgedata.meta import Quality, SeriesMeta
@@ -65,7 +66,7 @@ class NOAACoops(BaseSource):
     interval: str | None = None
 
     def __post_init__(self) -> None:
-        valid_products = {"water_level", "predictions", "wind", "air_pressure"}
+        valid_products = {"water_level", "predictions", "wind", "wind_u_10m", "wind_v_10m", "air_pressure"}
 
         if self.product not in valid_products:
             raise ValueError(f"Unsupported NOAA product: {self.product!r}")
@@ -78,7 +79,8 @@ class NOAACoops(BaseSource):
         units = {
             "water_level": "m",
             "predictions": "m",
-            "wind": "m s-1",
+            "wind_u_10m": "m s-1",
+            "wind_v_10m": "m s-1",
             "air_pressure": "Pa",
         }
 
@@ -89,17 +91,21 @@ class NOAACoops(BaseSource):
 
 
     def _sampling(self) -> tuple[str, pd.Timedelta | None, str | None]:
-        """Return sampling convention, averaging window and timestamp label."""
         if self.product == "water_level":
             return "window_mean", pd.Timedelta("3min"), "centre"
 
-        if self.product == "air_pressure":
+        if self.product in {"air_pressure", "wind_u_10m", "wind_v_10m"}:
             return "instantaneous", None, None
 
-        raise ValueError(f"Sampling metadata not defined for NOAA CO-OPS product:{self.product!r}")
-
+        raise ValueError(
+            f"Sampling metadata not defined for NOAA CO-OPS product: {self.product!r}"
+        )
+    
     def _noaa_product(self) -> str:
-        """Returns the appropriate NOAA API product name, according to interval"""
+        """Returns the appropriate NOAA API product name, according to interval and source"""
+        if self.product in {"wind_u_10m", "wind_v_10m"}:
+                return "wind"
+
         if self.product != "water_level":
             return self.product
 
@@ -216,10 +222,21 @@ class NOAACoops(BaseSource):
         df = pd.DataFrame(raw["data"])
 
         times = pd.to_datetime(df["t"], utc=True)
-        values = pd.to_numeric(df["v"], errors="coerce")
 
-        if self.product == "air_pressure":
-            values = convert(values, "hPa", "Pa")
+        if self.product in {"wind_u_10m", "wind_v_10m"}:
+            speed = pd.to_numeric(df["s"], errors="coerce")
+            direction = np.deg2rad(pd.to_numeric(df["d"], errors="coerce"))
+
+            if self.product == "wind_u_10m":
+                values = -speed * np.sin(direction)
+            else:
+                values = -speed * np.cos(direction)
+
+        else:
+            values = pd.to_numeric(df["v"], errors="coerce")
+
+            if self.product == "air_pressure":
+                values = convert(values, "hPa", "Pa")
 
         series = pd.Series(
             values.to_numpy(),
@@ -232,6 +249,8 @@ class NOAACoops(BaseSource):
         elif NOAAProduct == "hourly_height":
             quality = "verified"
         elif self.product == "air_pressure":
+            quality = "unknown"
+        elif self.product in {"wind_u_10m", "wind_v_10m"}:
             quality = "unknown"
         else:
             qualities = set(df["q"])
@@ -255,7 +274,7 @@ class NOAACoops(BaseSource):
             variable = "water_level"
         if variable == "water_level":
             station_type = "waterlevels"
-        elif variable == "air_pressure":
+        elif variable in {"air_pressure", "wind_u_10m", "wind_v_10m"}:
             station_type = "met"
         else:
             raise ValueError(f"Station discovery not yet implemented for NOAA variable: {variable!r}")
@@ -270,6 +289,12 @@ class NOAACoops(BaseSource):
             for station in stations
             if haversine_km(lat, lon, station["lat"], station["lng"]) <= radius_km
         ]
+        if variable == "water_level":
+                units = "m"
+                datum = "MSL"
+                sampling = "window_mean"
+                window = pd.Timedelta("3min")
+                label = "centre"
 
         if variable == "air_pressure":
             pressure_stations = []
@@ -283,16 +308,25 @@ class NOAACoops(BaseSource):
                     pressure_stations.append(station)
 
             nearby = pressure_stations
+            units  = "Pa"
+            datum = None
+            sampling = "instantaneous"
+            window = None
+            label = None
 
-        if variable == "water_level":
-            units = "m"
-            datum = "MSL"
-            sampling = "window_mean"
-            window = pd.Timedelta("3min")
-            label = "centre"
+        if  variable in {"wind_u_10m", "wind_v_10m"}:
+            wind_stations = []
 
-        else:  # air_pressure
-            units = "Pa"
+            for station in nearby:
+                sensors_url = station["sensors"]["self"]
+                sensors     = requests.get(sensors_url).json()["sensors"]
+
+                has_wind = any(sensor["name"] == "Wind" and sensor["status"] == 1 for sensor in sensors)
+                if has_wind:
+                    wind_stations.append(station)
+
+            nearby = wind_stations
+            units  = "m s-1"
             datum = None
             sampling = "instantaneous"
             window = None
