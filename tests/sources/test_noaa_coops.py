@@ -36,7 +36,8 @@ def test_metadata():
     assert "NOAA" in meta.attribution or "NOAA" in meta.licence
 
 
-@pytest.mark.vcr
+@pytest.mark.live
+@pytest.mark.enable_socket
 def test_find_stations():
     stations = NOAACoops.find_stations(40.70, -74.01, radius_km=5)
     assert stations and all(isinstance(m, SeriesMeta) for m in stations)
