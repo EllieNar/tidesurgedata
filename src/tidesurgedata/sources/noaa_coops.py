@@ -31,14 +31,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 import requests
-import numpy as np
 
-from tidesurgedata.units import convert
 from tidesurgedata.meta import Quality, SeriesMeta
 from tidesurgedata.sources.base import BaseSource, haversine_km
 from tidesurgedata.sources.registry import register_source
+from tidesurgedata.units import convert
 
 __all__ = ["NOAACoops"]
 
@@ -66,7 +66,14 @@ class NOAACoops(BaseSource):
     interval: str | None = None
 
     def __post_init__(self) -> None:
-        valid_products = {"water_level", "predictions", "wind", "wind_u_10m", "wind_v_10m", "air_pressure"}
+        valid_products = {
+            "water_level",
+            "predictions",
+            "wind",
+            "wind_u_10m",
+            "wind_v_10m",
+            "air_pressure",
+        }
 
         if self.product not in valid_products:
             raise ValueError(f"Unsupported NOAA product: {self.product!r}")
@@ -100,7 +107,7 @@ class NOAACoops(BaseSource):
         raise ValueError(
             f"Sampling metadata not defined for NOAA CO-OPS product: {self.product!r}"
         )
-    
+
     def _noaa_product(self) -> str:
         """Returns the appropriate NOAA API product name, according to interval and source"""
         if self.product in {"wind_u_10m", "wind_v_10m"}:
@@ -248,9 +255,7 @@ class NOAACoops(BaseSource):
             quality: Quality = "preliminary"
         elif NOAAProduct == "hourly_height":
             quality = "verified"
-        elif self.product == "air_pressure":
-            quality = "unknown"
-        elif self.product in {"wind_u_10m", "wind_v_10m"}:
+        elif self.product in {"air_pressure", "wind_u_10m", "wind_v_10m"}:
             quality = "unknown"
         else:
             qualities = set(df["q"])
@@ -277,7 +282,9 @@ class NOAACoops(BaseSource):
         elif variable in {"air_pressure", "wind_u_10m", "wind_v_10m"}:
             station_type = "met"
         else:
-            raise ValueError(f"Station discovery not yet implemented for NOAA variable: {variable!r}")
+            raise ValueError(
+                f"Station discovery not yet implemented for NOAA variable: {variable!r}"
+            )
 
         url = (f"https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type={station_type}")
         response = requests.get(url)
@@ -303,7 +310,10 @@ class NOAACoops(BaseSource):
                 sensors_url = station["sensors"]["self"]
                 sensors = requests.get(sensors_url).json()["sensors"]
 
-                has_pressure = any(sensor["name"] == "Barometric Pressure" and sensor["status"] == 1 for sensor in sensors)
+                has_pressure = any(
+                    sensor["name"] == "Barometric Pressure" and sensor["status"] == 1
+                    for sensor in sensors
+                )
                 if has_pressure:
                     pressure_stations.append(station)
 
@@ -321,7 +331,10 @@ class NOAACoops(BaseSource):
                 sensors_url = station["sensors"]["self"]
                 sensors     = requests.get(sensors_url).json()["sensors"]
 
-                has_wind = any(sensor["name"] == "Wind" and sensor["status"] == 1 for sensor in sensors)
+                has_wind = any(
+                    sensor["name"] == "Wind" and sensor["status"] == 1
+                    for sensor in sensors
+                )
                 if has_wind:
                     wind_stations.append(station)
 
